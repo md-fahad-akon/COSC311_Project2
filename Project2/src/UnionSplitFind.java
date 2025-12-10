@@ -1,250 +1,147 @@
 /**
- * UnionSplitFind.java
- * 
- * A high-level API for Union-Split-Find operations on ordered sets.
- * This class wraps the Treap implementation and provides a clean interface
- * for the three core operations:
- * 
- *   - UNION: Merge two ordered sets into one
- *   - SPLIT: Divide a set into two parts at a given value
- *   - FIND:  Check membership in the set
- * 
- * This data structure is useful for:
- *   - Dynamic set manipulation
- *   - Range queries on ordered data
- *   - Interval management
- *   - Database index operations
- * 
- * @author [Your Names Here]
- */
+ * Author Name: (1) Fahad Akon
+ *              (2) Salma Ibrahim
+ * Class:       COSC311
+ * Assignment:  Prject 2
+ * Date:        12/07/2025
+ * Problem:     Union-Split-Find Data Structure with Performance Testing.
+ * **/
+
 public class UnionSplitFind {
-    
-    private Treap treap;
-    private String name;  // Optional name for the set (useful for demos)
-    
+    /** Number of elements */
+    private final int n;
+
     /**
-     * Creates an empty Union-Split-Find structure
+     * setId[i] is the identifier of the set that element i belongs to.
+     * Many elements can share the same setId value.
      */
-    public UnionSplitFind() {
-        this.treap = new Treap();
-        this.name = "UnnamedSet";
+    private final int[] setId;
+
+    /**
+     * Next unique set id used by split(). This may grow beyond n,
+     * but that is fine because it is only a label.
+     */
+    private int nextSetId;
+
+    /**
+     * Construct a structure with elements 0..n-1,
+     * initially each element in its own set.
+     */
+    public UnionSplitFind(int n) {
+        if (n <= 0) {
+            throw new IllegalArgumentException("n must be positive");
+        }
+        this.n = n;
+        this.setId = new int[n];
+        for (int i = 0; i < n; i++) {
+            setId[i] = i; // each element is its own set
+        }
+        this.nextSetId = n; // new set ids start after the initial range
     }
-    
-    /**
-     * Creates a named Union-Split-Find structure
-     * @param name Name identifier for this set
-     */
-    public UnionSplitFind(String name) {
-        this.treap = new Treap();
-        this.name = name;
+
+    /** Return number of elements. */
+    public int size() {
+        return n;
     }
-    
-    /**
-     * Internal constructor with existing treap
-     */
-    private UnionSplitFind(Treap treap, String name) {
-        this.treap = treap;
-        this.name = name;
+
+    /** Check that 0 <= x < n. */
+    private void checkIndex(int x) {
+        if (x < 0 || x >= n) {
+            throw new IllegalArgumentException("Index out of bounds: " + x);
+        }
     }
-    
-    // ==================== CORE OPERATIONS ====================
-    
+
     /**
-     * FIND Operation
-     * 
-     * Determines if an element exists in the set.
-     * 
-     * @param element The element to search for
-     * @return true if element is in the set, false otherwise
-     * 
-     * Time Complexity: O(log n) expected
-     * 
-     * Example:
-     *   set = {1, 3, 5, 7, 9}
-     *   find(5) → true
-     *   find(4) → false
+     * FIND operation:
+     * Return the id of the set that x belongs to.
+     * O(1).
      */
-    public boolean find(int element) {
-        return treap.find(element);
+    public int find(int x) {
+        checkIndex(x);
+        return setId[x];
     }
-    
+
     /**
-     * SPLIT Operation
-     * 
-     * Divides this set into two sets based on a split value.
-     * After splitting, this set becomes empty.
-     * 
-     * @param splitValue The value to split at
-     * @return Array of two UnionSplitFind structures:
-     *         [0] contains elements ≤ splitValue
-     *         [1] contains elements > splitValue
-     * 
-     * Time Complexity: O(log n) expected
-     * 
-     * Example:
-     *   set = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
-     *   split(5) → [{1,2,3,4,5}, {6,7,8,9,10}]
+     * CONNECTED operation:
+     * Return true if a and b are in the same set.
+     * O(1).
      */
-    public UnionSplitFind[] split(int splitValue) {
-        Treap[] splitTreaps = treap.split(splitValue);
-        
-        UnionSplitFind left = new UnionSplitFind(splitTreaps[0], name + "_L");
-        UnionSplitFind right = new UnionSplitFind(splitTreaps[1], name + "_R");
-        
-        // Clear this set after splitting
-        this.treap = new Treap();
-        
-        return new UnionSplitFind[] { left, right };
+    public boolean connected(int a, int b) {
+        checkIndex(a);
+        checkIndex(b);
+        return setId[a] == setId[b];
     }
-    
+
     /**
-     * UNION Operation
-     * 
-     * Merges two ordered sets into one.
-     * PREREQUISITE: All elements in 'this' must be less than all elements in 'other'
-     * 
-     * @param other The set to merge with (must have all larger elements)
-     * @return A new merged UnionSplitFind structure
-     * 
-     * Time Complexity: O(log n) expected
-     * 
-     * Example:
-     *   set1 = {1, 2, 3}
-     *   set2 = {5, 6, 7}
-     *   union(set1, set2) → {1, 2, 3, 5, 6, 7}
+     * UNION operation:
+     * Merge the set containing a with the set containing b.
+     * Implementation: relabel all elements of b's set to a's set id.
+     * O(n).
      */
-    public UnionSplitFind union(UnionSplitFind other) {
-        // Validate precondition
-        if (!this.isEmpty() && !other.isEmpty()) {
-            if (this.getMax() >= other.getMin()) {
-                throw new IllegalArgumentException(
-                    "Union precondition violated: all elements in first set must be < all elements in second set. " +
-                    "Max of first set: " + this.getMax() + ", Min of second set: " + other.getMin()
-                );
+    public void union(int a, int b) {
+        checkIndex(a);
+        checkIndex(b);
+
+        int idA = setId[a];
+        int idB = setId[b];
+
+        if (idA == idB) {
+            // already in same set
+            return;
+        }
+
+        // Merge all elements currently in set idB into idA.
+        for (int i = 0; i < n; i++) {
+            if (setId[i] == idB) {
+                setId[i] = idA;
             }
         }
-        
-        Treap merged = Treap.merge(this.treap, other.treap);
-        return new UnionSplitFind(merged, "(" + this.name + "∪" + other.name + ")");
     }
-    
+
     /**
-     * Static UNION method for convenience
+     * SPLIT operation:
+     * Move a single element x into its own new set.
+     * This creates a fresh, unique set id just for x.
+     * O(1).
      */
-    public static UnionSplitFind union(UnionSplitFind left, UnionSplitFind right) {
-        return left.union(right);
+    public void split(int x) {
+        checkIndex(x);
+        setId[x] = nextSetId++;
     }
-    
-    // ==================== ADDITIONAL OPERATIONS ====================
-    
+
     /**
-     * Adds an element to the set
-     * @param element Element to add
+     * Utility: print all current sets and their elements.
      */
-    public void add(int element) {
-        treap.insert(element);
-    }
-    
-    /**
-     * Removes an element from the set
-     * @param element Element to remove
-     * @return true if element was found and removed
-     */
-    public boolean remove(int element) {
-        return treap.delete(element);
-    }
-    
-    /**
-     * Builds a set from an array of elements
-     * @param elements Array of elements to add
-     */
-    public void buildFromArray(int[] elements) {
-        for (int element : elements) {
-            treap.insert(element);
+    public void printSets() {
+        System.out.println("Current sets:");
+
+        for (int i = 0; i < n; i++) {
+            int id = setId[i];
+
+            // Only print this set once: when we encounter its first member.
+            boolean firstOccurrence = true;
+            for (int j = 0; j < i; j++) {
+                if (setId[j] == id) {
+                    firstOccurrence = false;
+                    break;
+                }
+            }
+            if (!firstOccurrence) {
+                continue; // this set already printed
+            }
+
+            System.out.print("  { ");
+            boolean firstElem = true;
+            for (int j = 0; j < n; j++) {
+                if (setId[j] == id) {
+                    if (!firstElem) {
+                        System.out.print(", ");
+                    }
+                    System.out.print(j);
+                    firstElem = false;
+                }
+            }
+            System.out.println(" }  (setId = " + id + ")");
         }
-    }
-    
-    /**
-     * Gets the number of elements in the set
-     */
-    public int size() {
-        return treap.size();
-    }
-    
-    /**
-     * Checks if the set is empty
-     */
-    public boolean isEmpty() {
-        return treap.isEmpty();
-    }
-    
-    /**
-     * Gets the minimum element
-     */
-    public int getMin() {
-        return treap.getMin();
-    }
-    
-    /**
-     * Gets the maximum element
-     */
-    public int getMax() {
-        return treap.getMax();
-    }
-    
-    /**
-     * Returns all elements in sorted order
-     */
-    public int[] toSortedArray() {
-        return treap.toSortedArray();
-    }
-    
-    /**
-     * Gets the name of this set
-     */
-    public String getName() {
-        return name;
-    }
-    
-    /**
-     * Sets the name of this set
-     */
-    public void setName(String name) {
-        this.name = name;
-    }
-    
-    /**
-     * Validates the internal structure
-     */
-    public boolean isValid() {
-        return treap.isValid();
-    }
-    
-    /**
-     * Prints the internal tree structure
-     */
-    public void printStructure() {
-        System.out.println("=== " + name + " ===");
-        treap.printTree();
-    }
-    
-    @Override
-    public String toString() {
-        int[] sorted = toSortedArray();
-        StringBuilder sb = new StringBuilder();
-        sb.append(name).append(" = {");
-        for (int i = 0; i < sorted.length; i++) {
-            sb.append(sorted[i]);
-            if (i < sorted.length - 1) sb.append(", ");
-        }
-        sb.append("}");
-        return sb.toString();
-    }
-    
-    /**
-     * Creates a string representation with size info
-     */
-    public String toDetailedString() {
-        return toString() + " [size=" + size() + "]";
     }
 }
